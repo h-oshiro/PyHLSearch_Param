@@ -46,9 +46,12 @@ python .\HLSearch_Param.py --help
 | `--max-depth` | `target` の判定を有効にする深さ |
 | `-p`, `--primes-count` | `PRIMES` と対応する `NUMS` の先頭 N 件だけを使用 |
 | `--cols` | ビットマスクで探索する列数 |
+| `--include-paths` | 該当するシフト経路を保持して結果ファイルに出力 |
 | `--log-level` | コンソール出力のログレベル |
 
 `--primes-count` を指定する場合、`--depth` は指定件数以下にしてください。
+既定では最大値の該当件数のみを集計し、シフト経路は保持・出力しません。経路も必要な場合は
+`--include-paths` を指定してください。
 
 ## 設定
 
@@ -70,7 +73,7 @@ python .\HLSearch_Param.py --help
 実行するとリポジトリのルートに次のファイルを作成します。
 
 - `HLSearch_Param.log`: ローテーションされる実行ログ
-- `shift_paths_YYYYMMDD_HHMMSS.txt`: 最大残存候補数と、その値を達成したシフト経路
+- `shift_paths_YYYYMMDD_HHMMSS.txt`: 最大残存候補数、実行時の探索設定、最大値を達成したシフト経路
 
 これらの生成ファイルは Git の管理対象外です。
 

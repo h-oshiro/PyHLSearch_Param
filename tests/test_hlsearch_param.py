@@ -85,6 +85,7 @@ class StateTests(unittest.TestCase):
             target=99,
             max_depth=3,
             cols=6,
+            collect_paths=True,
         ).run()
 
         self.assertEqual(state.max_count, 2)
@@ -95,6 +96,21 @@ class StateTests(unittest.TestCase):
         )
         self.assertEqual(state.nodes_searched, 8)
         self.assertEqual(state.shift_path, [])
+
+    def test_run_counts_matches_without_collecting_paths_by_default(self) -> None:
+        state = State(
+            primes=[2, 3],
+            nums=[[0, 1], [0, 1, 2]],
+            depth=2,
+            limit=0,
+            target=99,
+            max_depth=3,
+            cols=6,
+        ).run()
+
+        self.assertEqual(state.max_count, 2)
+        self.assertEqual(state.results, 6)
+        self.assertEqual(state.shifts, [])
 
     def test_run_prunes_paths_below_the_limit(self) -> None:
         state = State(
@@ -150,6 +166,7 @@ class MainTests(unittest.TestCase):
                             "4",
                             "--max-depth",
                             "2",
+                            "--include-paths",
                             "--log-level",
                             "ERROR",
                         ],
@@ -162,7 +179,16 @@ class MainTests(unittest.TestCase):
                     self.assertEqual(len(output_files), 1)
                     self.assertEqual(
                         output_files[0].read_text(encoding="utf-8"),
-                        "max_count:2\nresults:1\n[1]\n",
+                        "max_count:2\n"
+                        "results:1\n"
+                        "depth:1\n"
+                        "limit:0\n"
+                        f"target:{cfg.TARGET}\n"
+                        "max_depth:2\n"
+                        "primes_count:1\n"
+                        "cols:4\n"
+                        "include_paths:True\n"
+                        "[1]\n",
                     )
                     self.assertTrue(log_file.is_file())
                 finally:
@@ -205,6 +231,7 @@ class ParseArgsTests(unittest.TestCase):
                 "6",
                 "--cols",
                 "100",
+                "--include-paths",
                 "--log-level",
                 "DEBUG",
             ]
@@ -216,4 +243,5 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(args.target, 5)
         self.assertEqual(args.primes_count, 6)
         self.assertEqual(args.cols, 100)
+        self.assertTrue(args.include_paths)
         self.assertEqual(args.log_level, "DEBUG")

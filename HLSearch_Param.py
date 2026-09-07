@@ -36,6 +36,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("-t", "--target", type=int, default=cfg.TARGET, help="depth == max-depth のときの目標値")
     parser.add_argument("-p", "--primes-count", type=int, default=None, metavar="N", help="PRIMES の先頭 N 個だけ使用")
     parser.add_argument("--cols", type=int, default=cfg.COLS, help="列数")
+    parser.add_argument(
+        "--include-paths",
+        action="store_true",
+        help="該当するシフト経路を保持して結果ファイルに出力",
+    )
     # parser.add_argument("--output", type=str, default=shift_path_file, help="結果出力先")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="コンソールログレベル")
     return parser.parse_args(argv)
@@ -78,7 +83,16 @@ def main(
     logger.info("設定: depth=%d limit=%d max_depth=%d target=%d", args.depth, args.limit, args.max_depth, args.target)
 
     primes, nums = select_search_data(cfg.PRIMES, cfg.NUMS, args.primes_count)
-    state = State(primes, nums, args.depth, args.limit, args.target, args.max_depth, args.cols)
+    state = State(
+        primes,
+        nums,
+        args.depth,
+        args.limit,
+        args.target,
+        args.max_depth,
+        args.cols,
+        collect_paths=args.include_paths,
+    )
     result_state = state.run()
 
     logger.info("最大値: %d", result_state.max_count)
@@ -90,9 +104,17 @@ def main(
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(f"max_count:{result_state.max_count}\n")
         f.write(f"results:{result_state.results}\n")
-        for shift in result_state.shifts:
-            logger.info("シフト経路: %s", shift)
-            f.write(f"{shift}\n")
+        f.write(f"depth:{args.depth}\n")
+        f.write(f"limit:{args.limit}\n")
+        f.write(f"target:{args.target}\n")
+        f.write(f"max_depth:{args.max_depth}\n")
+        f.write(f"primes_count:{len(primes)}\n")
+        f.write(f"cols:{args.cols}\n")
+        f.write(f"include_paths:{args.include_paths}\n")
+        if args.include_paths:
+            for shift in result_state.shifts:
+                logger.info("シフト経路: %s", shift)
+                f.write(f"{shift}\n")
 
 
     logger.info("HLSearch_Param 終了")

@@ -68,6 +68,7 @@ class State:
         max_depth: int,
         cols: int,
         use_cuda: Optional[bool] = None,
+        collect_paths: bool = False,
     ) -> None:
         if depth <= 0:
             raise ValueError(f"depth は正の整数である必要があります: {depth}")
@@ -103,6 +104,7 @@ class State:
         self.target = target
         self.max_depth = max_depth
         self.cols = cols
+        self.collect_paths = collect_paths
 
         self._cupy = _load_cuda_module() if use_cuda is not False else None
         if use_cuda is True and self._cupy is None:
@@ -162,11 +164,19 @@ class State:
             if count > self.max_count:
                 self.max_count = count
                 self.results = 1
-                self.shifts = [list(self.shift_path)]
-                logger.info("New max_count=%d (path=%s)", self.max_count, self.shift_path)
+                self.shifts = [list(self.shift_path)] if self.collect_paths else []
+                if self.collect_paths:
+                    logger.info(
+                        "New max_count=%d (path=%s)",
+                        self.max_count,
+                        self.shift_path,
+                    )
+                else:
+                    logger.info("New max_count=%d", self.max_count)
             elif count == self.max_count:
                 self.results += 1
-                self.shifts.append(list(self.shift_path))
+                if self.collect_paths:
+                    self.shifts.append(list(self.shift_path))
             return
 
         next_level = level + 1

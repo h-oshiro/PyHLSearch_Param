@@ -140,7 +140,7 @@ class State:
             self.shift_path.pop()
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="HLSearch fast2: 素数シフト探索プログラム", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description="HLSearch Param: 素数シフト探索プログラム", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-d", "--depth", type=int, default=cfg.DEPTH, help="探索する階層数")
     parser.add_argument("-l", "--limit", type=int, default=cfg.LIMIT, help="枝刈り下限")
     parser.add_argument("--max-depth", type=int, default=cfg.MAX_DEPTH, help="最大深さ")
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     base = os.path.dirname(os.path.abspath(__file__))
     LOG_PATH = setup_logging(base, args.log_level)
 
-    logger.info("HLSearch_fast2 開始 (log file: %s)", LOG_PATH)
+    logger.info("HLSearch_Param 開始 (log file: %s)", LOG_PATH)
     logger.info("設定: depth=%d limit=%d max_depth=%d target=%d", args.depth, args.limit, args.max_depth, args.target)
 
     primes, nums = select_search_data(cfg.PRIMES, cfg.NUMS, args.primes_count)
@@ -198,4 +198,4 @@ if __name__ == "__main__":
             f.write(f"{shift}\n")
 
 
-    logger.info("HLSearch_fast2 終了")
+    logger.info("HLSearch_Param 終了")

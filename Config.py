@@ -90,11 +90,9 @@ PRIMES: List[int] = [
 
 NUMS: list[list[int]] = [
     [1],    # 2
-    [i for i in range(3)],    # 3
-    [i for i in range(5)],    # 5
-    [i for i in range(7)],    # 7
-
-
+    [1],    # 3
+    [4],    # 5
+    [4],    # 7
     [i for i in range(11)],    # 11
     [i for i in range(13)],    # 13
     [i for i in range(17)],    # 17

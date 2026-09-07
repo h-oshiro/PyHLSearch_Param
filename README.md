@@ -76,3 +76,11 @@ python -m unittest discover -s .\tests -v
 ```powershell
 python -m unittest tests.test_hlsearch_param.StateTests.test_run_records_all_paths_tied_for_the_best_count -v
 ```
+
+## 更新履歴
+
+### 開発中
+
+- `--primes-count` で `PRIMES` と対応する `NUMS` の先頭 N 件を探索対象として選択できるようにした
+- ビットマスク生成、探索の枝刈り、引数処理を対象とした単体テストを追加した
+- 実行方法、設定、出力、テスト手順を README に記載した

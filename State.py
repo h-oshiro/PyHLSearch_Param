@@ -1,8 +1,14 @@
 """Hardy-Littlewood 探索の状態管理とビットマスク探索ロジック。"""
 import logging
+import sys
 import time
 from types import ModuleType
 from typing import List, Optional, Sequence
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
 
 
 logger = logging.getLogger("HLSearch_Param")
@@ -69,6 +75,7 @@ class State:
         cols: int,
         use_cuda: Optional[bool] = None,
         collect_paths: bool = False,
+        show_progress: bool = True,
     ) -> None:
         if depth <= 0:
             raise ValueError(f"depth は正の整数である必要があります: {depth}")
@@ -105,6 +112,7 @@ class State:
         self.max_depth = max_depth
         self.cols = cols
         self.collect_paths = collect_paths
+        self.show_progress = show_progress
 
         self._cupy = _load_cuda_module() if use_cuda is not False else None
         if use_cuda is True and self._cupy is None:
@@ -132,7 +140,23 @@ class State:
             else (1 << self.cols) - 1
         )
 
-        for shift in reversed(self.nums[0]):
+        shifts = reversed(self.nums[0])
+        if self.show_progress:
+            if tqdm is None:
+                logger.warning(
+                    "tqdm が未導入のため進捗表示を無効にします。"
+                    "`pip install tqdm` で有効化できます。"
+                )
+            else:
+                shifts = tqdm(
+                    shifts,
+                    total=len(self.nums[0]),
+                    desc="探索中",
+                    unit="shift",
+                    disable=not sys.stderr.isatty(),
+                )
+
+        for shift in shifts:
             self.shift_path.append(shift)
             self._search(0, initial_mask & self.bit_tables[0][shift])
             self.shift_path.pop()

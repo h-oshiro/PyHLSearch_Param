@@ -34,7 +34,6 @@ LOG_BACKUP_COUNT: int = 100
 # ファイルには詳細なデバッグログを記録し、コンソールには重要なログのみ表示
 CONSOLE_LOG_LEVEL: int = logging.INFO
 FILE_LOG_LEVEL: int = logging.DEBUG
-SHOW_PROGRESS: bool = True
 
 # ログのフォーマット
 LOG_FORMAT: str = "%(asctime)s [%(levelname)s] %(funcName)s: %(message)s"

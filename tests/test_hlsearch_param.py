@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import Config as cfg
 from HLSearch_Param import (
@@ -75,6 +75,27 @@ class StateTests(unittest.TestCase):
         with patch("State._load_cuda_module", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "CUDA"):
                 State([2], [[0, 1]], 1, 0, 0, 1, 1, use_cuda=True)
+
+    def test_shows_progress_for_top_level_shifts(self) -> None:
+        with patch("State.tqdm", side_effect=lambda shifts, **kwargs: shifts) as progress:
+            State(
+                [2],
+                [[0, 1]],
+                1,
+                0,
+                99,
+                2,
+                4,
+                use_cuda=False,
+            ).run()
+
+        progress.assert_called_once_with(
+            ANY,
+            total=2,
+            desc="探索中",
+            unit="shift",
+            disable=ANY,
+        )
 
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(
@@ -173,7 +194,7 @@ class MainTests(unittest.TestCase):
                         base_dir=temp_dir,
                     )
 
-                    output_files = list(Path(temp_dir).glob("shift_paths_*.txt"))
+                    output_files = list(Path(temp_dir).glob("results_*.txt"))
                     self.assertEqual(result.max_count, 2)
                     self.assertEqual(result.results, 1)
                     self.assertEqual(len(output_files), 1)
@@ -188,6 +209,7 @@ class MainTests(unittest.TestCase):
                         "primes_count:1\n"
                         "cols:4\n"
                         "include_paths:True\n"
+                        "show_progress:True\n"
                         "[1]\n",
                     )
                     self.assertTrue(log_file.is_file())
@@ -232,6 +254,7 @@ class ParseArgsTests(unittest.TestCase):
                 "--cols",
                 "100",
                 "--include-paths",
+                "--no-progress",
                 "--log-level",
                 "DEBUG",
             ]
@@ -244,4 +267,5 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(args.primes_count, 6)
         self.assertEqual(args.cols, 100)
         self.assertTrue(args.include_paths)
+        self.assertFalse(args.show_progress)
         self.assertEqual(args.log_level, "DEBUG")

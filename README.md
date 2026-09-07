@@ -14,6 +14,7 @@
 - Python 3.10 以上
 - CPU 実行: 追加パッケージは不要
 - CUDA 実行: CUDA 環境に対応する [CuPy](https://cupy.dev/)（例: `pip install cupy-cuda12x`）
+- 進捗表示: [tqdm](https://tqdm.github.io/)（`pip install tqdm`）
 
 CuPy と使用可能な CUDA デバイスを検出すると、`State` は自動的に CUDA を使って探索します。
 CuPy が未インストールの場合、または CUDA デバイスを利用できない場合は、従来どおり CPU で実行します。
@@ -47,11 +48,13 @@ python .\HLSearch_Param.py --help
 | `-p`, `--primes-count` | `PRIMES` と対応する `NUMS` の先頭 N 件だけを使用 |
 | `--cols` | ビットマスクで探索する列数 |
 | `--include-paths` | 該当するシフト経路を保持して結果ファイルに出力 |
+| `--no-progress` | tqdm による進捗表示を無効化 |
 | `--log-level` | コンソール出力のログレベル |
 
 `--primes-count` を指定する場合、`--depth` は指定件数以下にしてください。
 既定では最大値の該当件数のみを集計し、シフト経路は保持・出力しません。経路も必要な場合は
 `--include-paths` を指定してください。
+進捗表示は既定で有効です。`Config.py` の `SHOW_PROGRESS` または `--no-progress` で無効化できます。
 
 ## 設定
 
@@ -73,7 +76,7 @@ python .\HLSearch_Param.py --help
 実行するとリポジトリのルートに次のファイルを作成します。
 
 - `HLSearch_Param.log`: ローテーションされる実行ログ
-- `shift_paths_YYYYMMDD_HHMMSS.txt`: 最大残存候補数、実行時の探索設定、最大値を達成したシフト経路
+- `results_YYYYMMDD_HHMMSS.txt`: 最大残存候補数、実行時の探索設定、最大値を達成したシフト経路
 
 これらの生成ファイルは Git の管理対象外です。
 

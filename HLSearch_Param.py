@@ -41,6 +41,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="該当するシフト経路を保持して結果ファイルに出力",
     )
+    parser.add_argument(
+        "--no-progress",
+        action="store_false",
+        dest="show_progress",
+        default=cfg.SHOW_PROGRESS,
+        help="tqdm による進捗表示を無効化",
+    )
     # parser.add_argument("--output", type=str, default=shift_path_file, help="結果出力先")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="コンソールログレベル")
     return parser.parse_args(argv)
@@ -52,7 +59,7 @@ def setup_logging(base_dir: str | os.PathLike[str], console_level: str = "INFO")
         handler.close()
         logger.removeHandler(handler)
 
-    formatter = cfg.LOG_FORMAT
+    formatter = logging.Formatter(cfg.LOG_FORMAT)
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(getattr(logging, console_level))
@@ -92,6 +99,7 @@ def main(
         args.max_depth,
         args.cols,
         collect_paths=args.include_paths,
+        show_progress=args.show_progress,
     )
     result_state = state.run()
 
@@ -100,7 +108,7 @@ def main(
 
     now = datetime.datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(base, f"shift_paths_{timestamp}.txt")
+    output_file = os.path.join(base, f"results_{timestamp}.txt")
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(f"max_count:{result_state.max_count}\n")
         f.write(f"results:{result_state.results}\n")
@@ -111,6 +119,7 @@ def main(
         f.write(f"primes_count:{len(primes)}\n")
         f.write(f"cols:{args.cols}\n")
         f.write(f"include_paths:{args.include_paths}\n")
+        f.write(f"show_progress:{args.show_progress}\n")
         if args.include_paths:
             for shift in result_state.shifts:
                 logger.info("シフト経路: %s", shift)

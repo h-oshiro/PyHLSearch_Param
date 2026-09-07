@@ -41,8 +41,8 @@ change.
 
 ## Architecture
 
-`HLSearch_Param.py` is both the command-line entry point and the search engine.
-`parse_args()` takes default values from `Config.py`; the main block initializes
+`HLSearch_Param.py` contains the command-line entry point and search engine.
+`parse_args()` takes default values from `Config.py`; `main()` initializes
 logging, constructs `State`, runs it, and writes matching shift paths to a
 timestamped `shift_paths_YYYYMMDD_HHMMSS.txt` file next to the source.
 
@@ -69,12 +69,14 @@ are discarded.
   `0 <= shift < PRIMES[index]` table index. The committed configuration does
   not meet those conditions for its entire declared `PRIMES` range, so retain
   the default shallow depth unless the relevant data is corrected.
-- `State` validates `depth`, `cols`, and `limit`; preserve those constraints when
-  extending the command-line interface or configuration.
+- `State` validates `depth`, `cols`, `limit`, selected `NUMS` length, primes
+  being integers of at least two, and every selected shift before building bit
+  tables. Preserve these constraints when extending the command-line interface
+  or configuration.
 - `--primes-count` restricts both `PRIMES` and `NUMS` to their first N entries
   before constructing `State`; `--depth` must not exceed that selected count.
 - Search artifacts are intentionally written in the repository directory:
-  `HLSearch_fast2.log` (with rotating backups) and timestamped shift-path files.
+  `HLSearch_Param.log` (with rotating backups) and timestamped shift-path files.
   These generated `.log` and `.txt` files are ignored by Git.
 - Logging is initialized through `setup_logging()` with a DEBUG rotating file
   handler and a separately configurable console level. Use the module `logger`

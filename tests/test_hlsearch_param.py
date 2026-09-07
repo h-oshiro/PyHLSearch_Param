@@ -1,6 +1,17 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from HLSearch_Param import State, build_bit_tables, parse_args, select_search_data
+import Config as cfg
+from HLSearch_Param import (
+    State,
+    build_bit_tables,
+    logger,
+    main,
+    parse_args,
+    select_search_data,
+)
 
 
 class BuildBitTablesTests(unittest.TestCase):
@@ -40,6 +51,20 @@ class StateTests(unittest.TestCase):
             State([2], [[0, 1]], 1, 0, 0, 1, 0)
         with self.assertRaises(ValueError):
             State([2], [[0, 1]], 1, -1, 0, 1, 1)
+
+    def test_rejects_insufficient_shift_lists_for_depth(self) -> None:
+        with self.assertRaisesRegex(ValueError, "nums の要素数"):
+            State([2, 3], [[0, 1]], 2, 0, 0, 2, 1)
+
+    def test_rejects_out_of_range_and_non_integer_shifts(self) -> None:
+        with self.assertRaisesRegex(ValueError, "nums\\[0\\]"):
+            State([2], [[2]], 1, 0, 0, 1, 1)
+        with self.assertRaisesRegex(ValueError, "nums\\[0\\]"):
+            State([2], [["1"]], 1, 0, 0, 1, 1)
+
+    def test_rejects_prime_values_smaller_than_two(self) -> None:
+        with self.assertRaisesRegex(ValueError, "primes\\[0\\]"):
+            State([1], [[0]], 1, 0, 0, 1, 1)
 
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(
@@ -90,6 +115,68 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state.max_count, 0)
         self.assertEqual(state.results, 0)
         self.assertEqual(state.shifts, [])
+
+
+class MainTests(unittest.TestCase):
+    def _close_log_handlers(self) -> None:
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
+
+    def test_runs_search_and_writes_result_and_log_files(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / "HLSearch_Param.log"
+            with patch.object(cfg, "LOG_FILE", log_file):
+                try:
+                    result = main(
+                        [
+                            "--primes-count",
+                            "1",
+                            "--depth",
+                            "1",
+                            "--limit",
+                            "0",
+                            "--cols",
+                            "4",
+                            "--max-depth",
+                            "2",
+                            "--log-level",
+                            "ERROR",
+                        ],
+                        base_dir=temp_dir,
+                    )
+
+                    output_files = list(Path(temp_dir).glob("shift_paths_*.txt"))
+                    self.assertEqual(result.max_count, 2)
+                    self.assertEqual(result.results, 1)
+                    self.assertEqual(len(output_files), 1)
+                    self.assertEqual(
+                        output_files[0].read_text(encoding="utf-8"),
+                        "max_count:2\nresults:1\n[1]\n",
+                    )
+                    self.assertTrue(log_file.is_file())
+                finally:
+                    self._close_log_handlers()
+
+    def test_rejects_depth_larger_than_selected_primes_count(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / "HLSearch_Param.log"
+            with patch.object(cfg, "LOG_FILE", log_file):
+                try:
+                    with self.assertRaisesRegex(ValueError, "primes の要素数\\(1\\)"):
+                        main(
+                            [
+                                "--primes-count",
+                                "1",
+                                "--depth",
+                                "2",
+                                "--log-level",
+                                "ERROR",
+                            ],
+                            base_dir=temp_dir,
+                        )
+                finally:
+                    self._close_log_handlers()
 
 
 class ParseArgsTests(unittest.TestCase):

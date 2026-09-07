@@ -53,7 +53,7 @@ class State:
     def __init__(
         self,
         primes: Sequence[int],
-        nums: Optional[Sequence[Sequence[int]]],
+        nums: Sequence[Sequence[int]],
         depth: int,
         limit: int,
         target: int,
@@ -66,13 +66,29 @@ class State:
             raise ValueError(
                 f"depth={depth} が primes の要素数({len(primes)})を超えています"
             )
+        if depth > len(nums):
+            raise ValueError(
+                f"depth={depth} が nums の要素数({len(nums)})を超えています"
+            )
         if cols <= 0:
             raise ValueError(f"cols は正の整数である必要があります: {cols}")
         if limit < 0:
             raise ValueError(f"limit は0以上である必要があります: {limit}")
 
         self.primes = list(primes[:depth])
-        self.nums = list(nums[:depth]) if nums is not None else None
+        self.nums = [list(shifts) for shifts in nums[:depth]]
+        for level, (prime, shifts) in enumerate(zip(self.primes, self.nums)):
+            if not isinstance(prime, int) or prime <= 1:
+                raise ValueError(
+                    f"primes[{level}] は2以上の整数である必要があります: {prime!r}"
+                )
+            for shift in shifts:
+                if not isinstance(shift, int) or not 0 <= shift < prime:
+                    raise ValueError(
+                        f"nums[{level}] のシフトは0以上{prime}未満の整数である必要があります: "
+                        f"{shift!r}"
+                    )
+
         self.depth = depth
         self.limit = limit
         self.target = target
@@ -152,29 +168,37 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 def setup_logging(base_dir: str | os.PathLike[str], console_level: str = "INFO") -> str:
-    log_path = os.path.join(base_dir, "HLSearch_Param.log")
+    log_path = cfg.LOG_FILE
     logger.setLevel(logging.DEBUG)
-    logger.handlers.clear()
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
 
-    formatter = logging.Formatter(fmt="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = cfg.LOG_FORMAT
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(getattr(logging, console_level))
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    file_handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
+    file_handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=cfg.LOG_MAX_BYTES, backupCount=cfg.LOG_BACKUP_COUNT, encoding="utf-8")
+    file_handler.setLevel(cfg.FILE_LOG_LEVEL)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
     logger.info("ログファイルを作成しました: %s", log_path)
     return log_path
 
-if __name__ == "__main__":
-    argv = sys.argv[1:] 
+
+def main(
+    argv: Sequence[str] | None = None,
+    base_dir: str | os.PathLike[str] | None = None,
+) -> State:
+    """コマンドライン引数で探索を実行し、結果をファイルへ出力する。"""
     args = parse_args(argv)
-    base = os.path.dirname(os.path.abspath(__file__))
+    base = os.fspath(base_dir) if base_dir is not None else os.path.dirname(
+        os.path.abspath(__file__)
+    )
     LOG_PATH = setup_logging(base, args.log_level)
 
     logger.info("HLSearch_Param 開始 (log file: %s)", LOG_PATH)
@@ -199,3 +223,8 @@ if __name__ == "__main__":
 
 
     logger.info("HLSearch_Param 終了")
+    return result_state
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

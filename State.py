@@ -1,10 +1,27 @@
 """Hardy-Littlewood 探索の状態管理とビットマスク探索ロジック。"""
 import logging
 import time
-from typing import List, Sequence
+from types import ModuleType
+from typing import List, Optional, Sequence
 
 
 logger = logging.getLogger("HLSearch_Param")
+
+
+def _load_cuda_module() -> Optional[ModuleType]:
+    """利用可能な CUDA デバイスを持つ CuPy モジュールを返す。"""
+    try:
+        import cupy
+    except ImportError:
+        return None
+
+    try:
+        if cupy.cuda.runtime.getDeviceCount() == 0:
+            return None
+    except cupy.cuda.runtime.CUDARuntimeError:
+        return None
+
+    return cupy
 
 
 def build_bit_tables(primes: Sequence[int], cols: int) -> List[List[int]]:
@@ -26,6 +43,18 @@ def build_bit_tables(primes: Sequence[int], cols: int) -> List[List[int]]:
     return tables
 
 
+def build_cuda_bit_tables(
+    primes: Sequence[int], cols: int, cupy: ModuleType
+) -> List[object]:
+    """CUDA 上でシフトごとの候補列マスクを構築する。"""
+    columns = cupy.arange(1, cols + 1, dtype=cupy.int64)
+    return [
+        (columns[None, :] - cupy.arange(prime, dtype=cupy.int64)[:, None]) % prime
+        != 1
+        for prime in primes
+    ]
+
+
 class State:
     """探索に必要な設定値と実行状態を保持する。"""
 
@@ -38,6 +67,7 @@ class State:
         target: int,
         max_depth: int,
         cols: int,
+        use_cuda: Optional[bool] = None,
     ) -> None:
         if depth <= 0:
             raise ValueError(f"depth は正の整数である必要があります: {depth}")
@@ -74,7 +104,17 @@ class State:
         self.max_depth = max_depth
         self.cols = cols
 
-        self.bit_tables = build_bit_tables(self.primes, self.cols)
+        self._cupy = _load_cuda_module() if use_cuda is not False else None
+        if use_cuda is True and self._cupy is None:
+            raise RuntimeError("CUDA を利用できる CuPy 環境が必要です")
+        self.uses_cuda = self._cupy is not None
+        if self.uses_cuda:
+            self.bit_tables = build_cuda_bit_tables(
+                self.primes, self.cols, self._cupy
+            )
+            logger.info("CUDA を使用して探索します")
+        else:
+            self.bit_tables = build_bit_tables(self.primes, self.cols)
         self.max_count = 0
         self.results = 0
         self.nodes_searched = 0
@@ -84,7 +124,11 @@ class State:
     def run(self) -> "State":
         """すべてのシフト経路を探索し、結果をこの状態に格納して返す。"""
         start_time = time.time()
-        initial_mask = (1 << self.cols) - 1
+        initial_mask = (
+            self._cupy.ones(self.cols, dtype=self._cupy.bool_)
+            if self.uses_cuda
+            else (1 << self.cols) - 1
+        )
 
         for shift in reversed(self.nums[0]):
             self.shift_path.append(shift)
@@ -102,7 +146,11 @@ class State:
 
     def _search(self, level: int, current_mask: int) -> None:
         self.nodes_searched += 1
-        count = current_mask.bit_count()
+        count = (
+            int(self._cupy.count_nonzero(current_mask).item())
+            if self.uses_cuda
+            else current_mask.bit_count()
+        )
 
         if count < self.limit or count < self.max_count:
             return

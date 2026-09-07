@@ -12,7 +12,11 @@
 ## 必要環境
 
 - Python 3.10 以上
-- 追加パッケージは不要
+- CPU 実行: 追加パッケージは不要
+- CUDA 実行: CUDA 環境に対応する [CuPy](https://cupy.dev/)（例: `pip install cupy-cuda12x`）
+
+CuPy と使用可能な CUDA デバイスを検出すると、`State` は自動的に CUDA を使って探索します。
+CuPy が未インストールの場合、または CUDA デバイスを利用できない場合は、従来どおり CPU で実行します。
 
 ## 実行方法
 

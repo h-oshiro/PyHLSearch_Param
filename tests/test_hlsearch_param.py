@@ -65,6 +65,17 @@ class StateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "primes\\[0\\]"):
             State([1], [[0]], 1, 0, 0, 1, 1)
 
+    def test_uses_cpu_when_cuda_is_disabled(self) -> None:
+        state = State([2], [[0, 1]], 1, 0, 0, 1, 1, use_cuda=False)
+
+        self.assertFalse(state.uses_cuda)
+        self.assertEqual(state.bit_tables, [[0, 1]])
+
+    def test_requires_cuda_when_requested(self) -> None:
+        with patch("State._load_cuda_module", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "CUDA"):
+                State([2], [[0, 1]], 1, 0, 0, 1, 1, use_cuda=True)
+
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(
             primes=[2, 3],

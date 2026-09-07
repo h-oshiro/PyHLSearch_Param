@@ -152,7 +152,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 def setup_logging(base_dir: str | os.PathLike[str], console_level: str = "INFO") -> str:
-    log_path = os.path.join(base_dir, "HLSearch_fast2.log")
+    log_path = os.path.join(base_dir, "HLSearch_Param.log")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
 

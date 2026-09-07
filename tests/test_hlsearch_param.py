@@ -5,13 +5,12 @@ from unittest.mock import patch
 
 import Config as cfg
 from HLSearch_Param import (
-    State,
-    build_bit_tables,
     logger,
     main,
     parse_args,
     select_search_data,
 )
+from State import State, build_bit_tables
 
 
 class BuildBitTablesTests(unittest.TestCase):

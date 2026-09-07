@@ -3,6 +3,12 @@
 ビット演算を使って Hardy-Littlewood 探索を実行する Python スクリプトです。
 素数ごとのシフト候補をビットマスクで表現し、候補集合の積集合を高速に探索します。
 
+## 構成
+
+- `HLSearch_Param.py`: コマンドライン引数、ログ初期化、探索の実行と結果ファイル出力
+- `State.py`: ビットテーブル生成と、探索状態を保持して深さ優先探索を実行する `State` クラス
+- `Config.py`: 既定の探索パラメータ、素数、シフト候補
+
 ## 必要環境
 
 - Python 3.10 以上
@@ -83,5 +89,6 @@ python -m unittest tests.test_hlsearch_param.StateTests.test_run_records_all_pat
 ### 開発中
 
 - `--primes-count` で `PRIMES` と対応する `NUMS` の先頭 N 件を探索対象として選択できるようにした
+- `State` クラスとビットテーブル生成処理を `State.py` に分離した
 - ビットマスク生成、探索の枝刈り、引数処理を対象とした単体テストを追加した
 - 実行方法、設定、出力、テスト手順を README に記載した

@@ -98,6 +98,8 @@ class StateTests(unittest.TestCase):
             disable=ANY,
         )
         progress_bar.__iter__.assert_called_once_with()
+        progress_bar.update.assert_not_called()
+        progress_bar.set_postfix.assert_not_called()
 
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(
@@ -151,7 +153,11 @@ class StateTests(unittest.TestCase):
             max_depth=3,
             cols=4,
             show_progress=False,
-        ).run()
+        )
+        state.max_count = 1
+        state.shift_path.append(1)
+        state._search(0, state.bit_tables[0][1])
+        state.shift_path.pop()
 
         self.assertEqual(
             [path for level, path in state.visited_paths if level == 1][:3],

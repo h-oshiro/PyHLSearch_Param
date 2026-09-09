@@ -36,15 +36,15 @@ def build_bit_tables(primes: Sequence[int], cols: int) -> List[List[int]]:
     各列 idx (1 <= idx <= cols) で (idx - s) % p == 1 となるビットを 0、
     それ以外を 1 としたビットマスクを事前作成する。
     """
+    full_mask = (1 << cols) - 1
     tables: List[List[int]] = []
     for p in primes:
         p_shifts: List[int] = []
         for s in range(p):
-            mask = 0
-            for idx in range(1, cols + 1):
-                if (idx - s) % p != 1:
-                    mask |= 1 << (idx - 1)
-            p_shifts.append(mask)
+            excluded_mask = 0
+            for idx in range(s + 1, cols + 1, p):
+                excluded_mask |= 1 << (idx - 1)
+            p_shifts.append(full_mask & ~excluded_mask)
         tables.append(p_shifts)
     return tables
 
@@ -172,13 +172,6 @@ class State:
     def _search(
         self, level: int, current_mask: int, count: Optional[int] = None
     ) -> None:
-        if self.show_progress:
-            if not tqdm is None:
-                self.pbar.update(level)
-                self.pbar.set_postfix(
-                    level=level+1,
-                    max_count=self.max_count
-                )
         self.nodes_searched += 1
         if count is None:
             count = (
@@ -224,9 +217,12 @@ class State:
             )
             next_paths.append((next_count, shift, next_mask))
 
-        for next_count, shift, next_mask in sorted(
-            next_paths, key=lambda path: path[0], reverse=True
-        ):
+        ordered_paths = (
+            sorted(next_paths, key=lambda path: path[0], reverse=True)
+            if self.max_count > 0
+            else next_paths
+        )
+        for next_count, shift, next_mask in ordered_paths:
             self.shift_path.append(shift)
             self._search(next_level, next_mask, next_count)
             self.shift_path.pop()

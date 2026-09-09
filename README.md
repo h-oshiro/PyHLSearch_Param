@@ -30,7 +30,7 @@ python .\HLSearch_Param.py
 小さな条件で動作を確認する例:
 
 ```powershell
-python .\HLSearch_Param.py --depth 3 --limit 0 --cols 100
+python .\HLSearch_Param.py --depth 3 --cols 100
 ```
 
 利用可能なオプションは次で確認できます。
@@ -42,7 +42,6 @@ python .\HLSearch_Param.py --help
 | オプション | 説明 |
 | --- | --- |
 | `-d`, `--depth` | 使用する素数とシフト候補の階層数 |
-| `-l`, `--limit` | この残存候補数を下回る枝を打ち切る下限 |
 | `-t`, `--target` | `depth == max-depth` の場合に使用する上限値 |
 | `--max-depth` | `target` の判定を有効にする深さ |
 | `-p`, `--primes-count` | `PRIMES` と対応する `NUMS` の先頭 N 件だけを使用 |
@@ -55,20 +54,20 @@ python .\HLSearch_Param.py --help
 既定では最大値の該当件数のみを集計し、シフト経路は保持・出力しません。経路も必要な場合は
 `--include-paths` を指定してください。
 進捗表示は既定で有効です。`Config.py` の `SHOW_PROGRESS` または `--no-progress` で無効化できます。
+固定の残存候補数による下限は設けず、探索中に見つかった最大値を下回る枝のみ打ち切ります。
 
 ## 設定
 
 既定値と探索データは `Config.py` で管理します。
 
-- `COLS`、`LIMIT`、`TARGET`、`DEPTH`、`MAX_DEPTH`: 探索の既定値
+- `COLS`、`TARGET`、`DEPTH`、`MAX_DEPTH`: 探索の既定値
 - `PRIMES`: 使用する素数の順序付きリスト
 - `NUMS`: 各素数に対応する許可済みシフトのリスト
 
 探索時は `NUMS[level]` の各値を、対応する素数のシフト用ビットテーブルの添字として
 そのまま使用します。`depth` を増やす、または探索データを変更する場合は、対象範囲の
 `NUMS` が存在し、すべてのシフトが `0 <= shift < PRIMES[level]` を満たすことを確認してください。
-現在の設定データは全 `PRIMES` 範囲ではこの条件を満たしていないため、深い探索を行う前に
-該当するデータを修正してください。選択した `depth` の範囲に不整合がある場合は、探索開始前に
+選択した `depth` の範囲に不整合がある場合は、探索開始前に
 `ValueError` で停止します。
 
 ## 出力
@@ -98,6 +97,7 @@ python -m unittest tests.test_hlsearch_param.StateTests.test_run_records_all_pat
 
 ### 開発中
 
+- `limit` による固定の枝刈り下限を廃止した
 - `--primes-count` で `PRIMES` と対応する `NUMS` の先頭 N 件を探索対象として選択できるようにした
 - `State` クラスとビットテーブル生成処理を `State.py` に分離した
 - ビットマスク生成、探索の枝刈り、引数処理を対象とした単体テストを追加した

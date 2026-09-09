@@ -31,7 +31,6 @@ def select_search_data(
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="HLSearch Param: 素数シフト探索プログラム", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-d", "--depth", type=int, default=cfg.DEPTH, help="探索する階層数")
-    parser.add_argument("-l", "--limit", type=int, default=cfg.LIMIT, help="枝刈り下限")
     parser.add_argument("--max-depth", type=int, default=cfg.MAX_DEPTH, help="最大深さ")
     parser.add_argument("-t", "--target", type=int, default=cfg.TARGET, help="depth == max-depth のときの目標値")
     parser.add_argument("-p", "--primes-count", type=int, default=None, metavar="N", help="PRIMES の先頭 N 個だけ使用")
@@ -87,14 +86,13 @@ def main(
     LOG_PATH = setup_logging(base, args.log_level)
 
     logger.info("HLSearch_Param 開始 (log file: %s)", LOG_PATH)
-    logger.info("設定: depth=%d limit=%d max_depth=%d target=%d", args.depth, args.limit, args.max_depth, args.target)
+    logger.info("設定: depth=%d max_depth=%d target=%d", args.depth, args.max_depth, args.target)
 
     primes, nums = select_search_data(cfg.PRIMES, cfg.NUMS, args.primes_count)
     state = State(
         primes,
         nums,
         args.depth,
-        args.limit,
         args.target,
         args.max_depth,
         args.cols,
@@ -113,7 +111,6 @@ def main(
         f.write(f"max_count:{result_state.max_count}\n")
         f.write(f"results:{result_state.results}\n")
         f.write(f"depth:{args.depth}\n")
-        f.write(f"limit:{args.limit}\n")
         f.write(f"target:{args.target}\n")
         f.write(f"max_depth:{args.max_depth}\n")
         f.write(f"primes_count:{len(primes)}\n")

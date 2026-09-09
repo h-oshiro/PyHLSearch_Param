@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import Config as cfg
 from HLSearch_Param import (
@@ -43,30 +43,28 @@ class SelectSearchDataTests(unittest.TestCase):
 class StateTests(unittest.TestCase):
     def test_rejects_invalid_constructor_arguments(self) -> None:
         with self.assertRaises(ValueError):
-            State([2], [[0, 1]], 0, 0, 0, 1, 1)
+            State([2], [[0, 1]], 0, 0, 1, 1)
         with self.assertRaises(ValueError):
-            State([2], [[0, 1]], 2, 0, 0, 2, 1)
+            State([2], [[0, 1]], 2, 0, 2, 1)
         with self.assertRaises(ValueError):
-            State([2], [[0, 1]], 1, 0, 0, 1, 0)
-        with self.assertRaises(ValueError):
-            State([2], [[0, 1]], 1, -1, 0, 1, 1)
+            State([2], [[0, 1]], 1, 0, 1, 0)
 
     def test_rejects_insufficient_shift_lists_for_depth(self) -> None:
         with self.assertRaisesRegex(ValueError, "nums の要素数"):
-            State([2, 3], [[0, 1]], 2, 0, 0, 2, 1)
+            State([2, 3], [[0, 1]], 2, 0, 2, 1)
 
     def test_rejects_out_of_range_and_non_integer_shifts(self) -> None:
         with self.assertRaisesRegex(ValueError, "nums\\[0\\]"):
-            State([2], [[2]], 1, 0, 0, 1, 1)
+            State([2], [[2]], 1, 0, 1, 1)
         with self.assertRaisesRegex(ValueError, "nums\\[0\\]"):
-            State([2], [["1"]], 1, 0, 0, 1, 1)
+            State([2], [["1"]], 1, 0, 1, 1)
 
     def test_rejects_prime_values_smaller_than_two(self) -> None:
         with self.assertRaisesRegex(ValueError, "primes\\[0\\]"):
-            State([1], [[0]], 1, 0, 0, 1, 1)
+            State([1], [[0]], 1, 0, 1, 1)
 
     def test_uses_cpu_when_cuda_is_disabled(self) -> None:
-        state = State([2], [[0, 1]], 1, 0, 0, 1, 1, use_cuda=False)
+        state = State([2], [[0, 1]], 1, 0, 1, 1, use_cuda=False)
 
         self.assertFalse(state.uses_cuda)
         self.assertEqual(state.bit_tables, [[0, 1]])
@@ -74,15 +72,16 @@ class StateTests(unittest.TestCase):
     def test_requires_cuda_when_requested(self) -> None:
         with patch("State._load_cuda_module", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "CUDA"):
-                State([2], [[0, 1]], 1, 0, 0, 1, 1, use_cuda=True)
+                State([2], [[0, 1]], 1, 0, 1, 1, use_cuda=True)
 
     def test_shows_progress_for_top_level_shifts(self) -> None:
-        with patch("State.tqdm", side_effect=lambda shifts, **kwargs: shifts) as progress:
+        progress_bar = MagicMock()
+        progress_bar.__iter__.return_value = iter([1, 0])
+        with patch("State.tqdm", return_value=progress_bar) as progress:
             State(
                 [2],
                 [[0, 1]],
                 1,
-                0,
                 99,
                 2,
                 4,
@@ -96,13 +95,13 @@ class StateTests(unittest.TestCase):
             unit="shift",
             disable=ANY,
         )
+        progress_bar.__iter__.assert_called_once_with()
 
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(
             primes=[2, 3],
             nums=[[0, 1], [0, 1, 2]],
             depth=2,
-            limit=0,
             target=99,
             max_depth=3,
             cols=6,
@@ -123,7 +122,6 @@ class StateTests(unittest.TestCase):
             primes=[2, 3],
             nums=[[0, 1], [0, 1, 2]],
             depth=2,
-            limit=0,
             target=99,
             max_depth=3,
             cols=6,
@@ -133,27 +131,11 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state.results, 6)
         self.assertEqual(state.shifts, [])
 
-    def test_run_prunes_paths_below_the_limit(self) -> None:
-        state = State(
-            primes=[2, 3],
-            nums=[[0, 1], [0, 1, 2]],
-            depth=2,
-            limit=4,
-            target=99,
-            max_depth=3,
-            cols=6,
-        ).run()
-
-        self.assertEqual(state.max_count, 0)
-        self.assertEqual(state.results, 0)
-        self.assertEqual(state.nodes_searched, 2)
-
     def test_run_discards_counts_above_target_at_max_depth(self) -> None:
         state = State(
             primes=[2],
             nums=[[0, 1]],
             depth=1,
-            limit=0,
             target=1,
             max_depth=1,
             cols=4,
@@ -181,8 +163,6 @@ class MainTests(unittest.TestCase):
                             "1",
                             "--depth",
                             "1",
-                            "--limit",
-                            "0",
                             "--cols",
                             "4",
                             "--max-depth",
@@ -196,21 +176,21 @@ class MainTests(unittest.TestCase):
 
                     output_files = list(Path(temp_dir).glob("results_*.txt"))
                     self.assertEqual(result.max_count, 2)
-                    self.assertEqual(result.results, 1)
+                    self.assertEqual(result.results, 2)
                     self.assertEqual(len(output_files), 1)
                     self.assertEqual(
                         output_files[0].read_text(encoding="utf-8"),
                         "max_count:2\n"
-                        "results:1\n"
+                        "results:2\n"
                         "depth:1\n"
-                        "limit:0\n"
                         f"target:{cfg.TARGET}\n"
                         "max_depth:2\n"
                         "primes_count:1\n"
                         "cols:4\n"
                         "include_paths:True\n"
                         "show_progress:True\n"
-                        "[1]\n",
+                        "[1]\n"
+                        "[0]\n",
                     )
                     self.assertTrue(log_file.is_file())
                 finally:
@@ -243,8 +223,6 @@ class ParseArgsTests(unittest.TestCase):
             [
                 "--depth",
                 "3",
-                "--limit",
-                "10",
                 "--max-depth",
                 "4",
                 "--target",
@@ -261,7 +239,6 @@ class ParseArgsTests(unittest.TestCase):
         )
 
         self.assertEqual(args.depth, 3)
-        self.assertEqual(args.limit, 10)
         self.assertEqual(args.max_depth, 4)
         self.assertEqual(args.target, 5)
         self.assertEqual(args.primes_count, 6)

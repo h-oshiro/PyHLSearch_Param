@@ -69,7 +69,6 @@ class State:
         primes: Sequence[int],
         nums: Sequence[Sequence[int]],
         depth: int,
-        limit: int,
         target: int,
         max_depth: int,
         cols: int,
@@ -89,9 +88,6 @@ class State:
             )
         if cols <= 0:
             raise ValueError(f"cols は正の整数である必要があります: {cols}")
-        if limit < 0:
-            raise ValueError(f"limit は0以上である必要があります: {limit}")
-
         self.primes = list(primes[:depth])
         self.nums = [list(shifts) for shifts in nums[:depth]]
         for level, (prime, shifts) in enumerate(zip(self.primes, self.nums)):
@@ -107,7 +103,6 @@ class State:
                     )
 
         self.depth = depth
-        self.limit = limit
         self.target = target
         self.max_depth = max_depth
         self.cols = cols
@@ -148,18 +143,22 @@ class State:
                     "`pip install tqdm` で有効化できます。"
                 )
             else:
-                shifts = tqdm(
+                self.pbar = tqdm(
                     shifts,
                     total=len(self.nums[0]),
                     desc="探索中",
                     unit="shift",
                     disable=not sys.stderr.isatty(),
                 )
+                shifts = self.pbar
 
         for shift in shifts:
             self.shift_path.append(shift)
             self._search(0, initial_mask & self.bit_tables[0][shift])
             self.shift_path.pop()
+        if self.show_progress:
+            if not tqdm is None:
+                self.pbar.close()
 
         elapsed = time.time() - start_time
         logger.info(
@@ -171,6 +170,13 @@ class State:
         return self
 
     def _search(self, level: int, current_mask: int) -> None:
+        if self.show_progress:
+            if not tqdm is None:
+                self.pbar.update(level)
+                self.pbar.set_postfix(
+                    level=level+1,
+                    max_count=self.max_count
+                )
         self.nodes_searched += 1
         count = (
             int(self._cupy.count_nonzero(current_mask).item())
@@ -178,7 +184,7 @@ class State:
             else current_mask.bit_count()
         )
 
-        if count < self.limit or count < self.max_count:
+        if count < self.max_count:
             return
 
         if level + 1 >= self.depth:
@@ -189,14 +195,14 @@ class State:
                 self.max_count = count
                 self.results = 1
                 self.shifts = [list(self.shift_path)] if self.collect_paths else []
-                if self.collect_paths:
-                    logger.info(
-                        "New max_count=%d (path=%s)",
-                        self.max_count,
-                        self.shift_path,
-                    )
-                else:
-                    logger.info("New max_count=%d", self.max_count)
+                # if self.collect_paths:
+                #     logger.info(
+                #         "New max_count=%d (path=%s)",
+                #         self.max_count,
+                #         self.shift_path,
+                #     )
+                # else:
+                #     logger.info("New max_count=%d", self.max_count)
             elif count == self.max_count:
                 self.results += 1
                 if self.collect_paths:

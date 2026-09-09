@@ -24,7 +24,7 @@ python .\HLSearch_Param.py
 Use the CLI arguments to run a smaller, practical search while developing:
 
 ```powershell
-python .\HLSearch_Param.py --depth 3 --limit 0 --cols 100 --max-depth 249
+python .\HLSearch_Param.py --depth 3 --cols 100 --max-depth 249
 python .\HLSearch_Param.py --help
 ```
 
@@ -50,7 +50,7 @@ timestamped `shift_paths_YYYYMMDD_HHMMSS.txt` file next to the source.
 `build_bit_tables()` creates one integer bitmask for every allowed prime/shift
 combination across `cols` candidate columns. `_search()` intersects those masks
 with bitwise `&`, uses `int.bit_count()` as the surviving-candidate count, and
-prunes paths below `limit` or the current `max_count`. At leaves it records every
+prunes paths below the current `max_count`. At leaves it records every
 path tied for the best count; when `depth == max_depth`, paths exceeding `target`
 are discarded.
 
@@ -69,7 +69,7 @@ are discarded.
   `0 <= shift < PRIMES[index]` table index. The committed configuration does
   not meet those conditions for its entire declared `PRIMES` range, so retain
   the default shallow depth unless the relevant data is corrected.
-- `State` validates `depth`, `cols`, `limit`, selected `NUMS` length, primes
+- `State` validates `depth`, `cols`, selected `NUMS` length, primes
   being integers of at least two, and every selected shift before building bit
   tables. Preserve these constraints when extending the command-line interface
   or configuration.

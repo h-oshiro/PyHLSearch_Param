@@ -73,8 +73,6 @@ are discarded.
   being integers of at least two, and every selected shift before building bit
   tables. Preserve these constraints when extending the command-line interface
   or configuration.
-- `--primes-count` restricts both `PRIMES` and `NUMS` to their first N entries
-  before constructing `State`; `--depth` must not exceed that selected count.
 - Search artifacts are intentionally written in the repository directory:
   `HLSearch_Param.log` (with rotating backups) and timestamped shift-path files.
   These generated `.log` and `.txt` files are ignored by Git.

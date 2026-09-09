@@ -47,14 +47,12 @@ python .\HLSearch_Param.py --help
 | `-d`, `--depth` | 使用する素数とシフト候補の階層数 |
 | `-t`, `--target` | `depth == max-depth` の場合に使用する上限値 |
 | `--max-depth` | `target` の判定を有効にする深さ |
-| `-p`, `--primes-count` | `PRIMES` と対応する `NUMS` の先頭 N 件だけを使用 |
 | `--cols` | ビットマスクで探索する列数 |
 | `--include-paths` | 該当するシフト経路を保持して結果ファイルに出力 |
 | `--no-progress` | tqdm による進捗表示を無効化 |
 | `--use-cuda` | CUDA を明示的に使用する（利用できない場合はエラー） |
 | `--log-level` | コンソール出力のログレベル |
 
-`--primes-count` を指定する場合、`--depth` は指定件数以下にしてください。
 既定では最大値の該当件数のみを集計し、シフト経路は保持・出力しません。経路も必要な場合は
 `--include-paths` を指定してください。
 進捗表示は既定で有効で、最上位シフトの完了状況を表示します。`Config.py` の `SHOW_PROGRESS` または
@@ -107,7 +105,6 @@ python -m unittest tests.test_hlsearch_param.StateTests.test_run_records_all_pat
 
 - `limit` による固定の枝刈り下限を廃止した
 - CUDA の自動検出を廃止し、`--use-cuda` 指定時だけ CUDA を使用するようにした
-- `--primes-count` で `PRIMES` と対応する `NUMS` の先頭 N 件を探索対象として選択できるようにした
 - `State` クラスとビットテーブル生成処理を `State.py` に分離した
 - ビットマスク生成、探索の枝刈り、引数処理を対象とした単体テストを追加した
 - 実行方法、設定、出力、テスト手順を README に記載した

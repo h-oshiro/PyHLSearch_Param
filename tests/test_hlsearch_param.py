@@ -8,7 +8,6 @@ from HLSearch_Param import (
     logger,
     main,
     parse_args,
-    select_search_data,
 )
 from State import State, build_bit_tables
 
@@ -16,28 +15,6 @@ from State import State, build_bit_tables
 class BuildBitTablesTests(unittest.TestCase):
     def test_masks_exclude_the_expected_columns_for_each_shift(self) -> None:
         self.assertEqual(build_bit_tables([2], 4), [[0b1010, 0b0101]])
-
-
-class SelectSearchDataTests(unittest.TestCase):
-    def test_limits_primes_and_shift_lists_to_the_requested_count(self) -> None:
-        primes, nums = select_search_data(
-            primes=[2, 3, 5],
-            nums=[[0, 1], [0, 1, 2], [0, 1, 2, 3, 4]],
-            primes_count=2,
-        )
-
-        self.assertEqual(primes, [2, 3])
-        self.assertEqual(nums, [[0, 1], [0, 1, 2]])
-
-    def test_keeps_all_data_when_no_count_is_requested(self) -> None:
-        primes = [2, 3]
-        nums = [[0, 1], [0, 1, 2]]
-
-        self.assertEqual(select_search_data(primes, nums, None), (primes, nums))
-
-    def test_rejects_non_positive_count(self) -> None:
-        with self.assertRaises(ValueError):
-            select_search_data([2], [[0, 1]], 0)
 
 
 class StateTests(unittest.TestCase):
@@ -245,8 +222,6 @@ class MainTests(unittest.TestCase):
                 try:
                     result = main(
                         [
-                            "--primes-count",
-                            "1",
                             "--depth",
                             "1",
                             "--cols",
@@ -271,7 +246,6 @@ class MainTests(unittest.TestCase):
                         "depth:1\n"
                         f"target:{cfg.TARGET}\n"
                         "max_depth:2\n"
-                        "primes_count:1\n"
                         "cols:4\n"
                         "include_paths:True\n"
                         "show_progress:True\n"
@@ -283,27 +257,6 @@ class MainTests(unittest.TestCase):
                 finally:
                     self._close_log_handlers()
 
-    def test_rejects_depth_larger_than_selected_primes_count(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            log_file = Path(temp_dir) / "HLSearch_Param.log"
-            with patch.object(cfg, "LOG_FILE", log_file):
-                try:
-                    with self.assertRaisesRegex(ValueError, "primes の要素数\\(1\\)"):
-                        main(
-                            [
-                                "--primes-count",
-                                "1",
-                                "--depth",
-                                "2",
-                                "--log-level",
-                                "ERROR",
-                            ],
-                            base_dir=temp_dir,
-                        )
-                finally:
-                    self._close_log_handlers()
-
-
 class ParseArgsTests(unittest.TestCase):
     def test_parses_overridden_search_options(self) -> None:
         args = parse_args(
@@ -314,8 +267,6 @@ class ParseArgsTests(unittest.TestCase):
                 "4",
                 "--target",
                 "5",
-                "--primes-count",
-                "6",
                 "--cols",
                 "100",
                 "--include-paths",
@@ -329,7 +280,6 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(args.depth, 3)
         self.assertEqual(args.max_depth, 4)
         self.assertEqual(args.target, 5)
-        self.assertEqual(args.primes_count, 6)
         self.assertEqual(args.cols, 100)
         self.assertTrue(args.include_paths)
         self.assertFalse(args.show_progress)

@@ -5,27 +5,12 @@ import datetime
 import argparse
 import logging
 import logging.handlers
-from typing import Optional, Sequence, Tuple
+from typing import Sequence
 
 import Config as cfg
-from State import State, build_bit_tables
+from State import State
 
 logger = logging.getLogger("HLSearch_Param")
-
-
-def select_search_data(
-    primes: Sequence[int],
-    nums: Sequence[Sequence[int]],
-    primes_count: Optional[int],
-) -> Tuple[Sequence[int], Sequence[Sequence[int]]]:
-    """指定時は探索に使用する素数とシフト候補を同じ件数に制限する。"""
-    if primes_count is None:
-        return primes, nums
-    if primes_count <= 0:
-        raise ValueError(
-            f"primes_count は正の整数である必要があります: {primes_count}"
-        )
-    return primes[:primes_count], nums[:primes_count]
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -33,7 +18,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("-d", "--depth", type=int, default=cfg.DEPTH, help="探索する階層数")
     parser.add_argument("--max-depth", type=int, default=cfg.MAX_DEPTH, help="最大深さ")
     parser.add_argument("-t", "--target", type=int, default=cfg.TARGET, help="depth == max-depth のときの目標値")
-    parser.add_argument("-p", "--primes-count", type=int, default=None, metavar="N", help="PRIMES の先頭 N 個だけ使用")
     parser.add_argument("--cols", type=int, default=cfg.COLS, help="列数")
     parser.add_argument(
         "--include-paths",
@@ -99,10 +83,9 @@ def main(
         args.use_cuda,
     )
 
-    primes, nums = select_search_data(cfg.PRIMES, cfg.NUMS, args.primes_count)
     state = State(
-        primes,
-        nums,
+        cfg.PRIMES,
+        cfg.NUMS,
         args.depth,
         args.target,
         args.max_depth,
@@ -125,7 +108,6 @@ def main(
         f.write(f"depth:{args.depth}\n")
         f.write(f"target:{args.target}\n")
         f.write(f"max_depth:{args.max_depth}\n")
-        f.write(f"primes_count:{len(primes)}\n")
         f.write(f"cols:{args.cols}\n")
         f.write(f"include_paths:{args.include_paths}\n")
         f.write(f"show_progress:{args.show_progress}\n")

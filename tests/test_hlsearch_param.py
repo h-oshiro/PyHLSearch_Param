@@ -133,6 +133,31 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state.results, 6)
         self.assertEqual(state.shifts, [])
 
+    def test_explores_next_shifts_by_descending_surviving_count(self) -> None:
+        class RecordingState(State):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.visited_paths = []
+
+            def _search(self, level, current_mask, count=None) -> None:
+                self.visited_paths.append((level, list(self.shift_path)))
+                super()._search(level, current_mask, count)
+
+        state = RecordingState(
+            primes=[2, 3],
+            nums=[[0, 1], [0, 1, 2]],
+            depth=2,
+            target=99,
+            max_depth=3,
+            cols=4,
+            show_progress=False,
+        ).run()
+
+        self.assertEqual(
+            [path for level, path in state.visited_paths if level == 1][:3],
+            [[1, 1], [1, 2], [1, 0]],
+        )
+
     def test_run_discards_counts_above_target_at_max_depth(self) -> None:
         state = State(
             primes=[2],

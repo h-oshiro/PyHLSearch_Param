@@ -169,7 +169,9 @@ class State:
         )
         return self
 
-    def _search(self, level: int, current_mask: int) -> None:
+    def _search(
+        self, level: int, current_mask: int, count: Optional[int] = None
+    ) -> None:
         if self.show_progress:
             if not tqdm is None:
                 self.pbar.update(level)
@@ -178,11 +180,12 @@ class State:
                     max_count=self.max_count
                 )
         self.nodes_searched += 1
-        count = (
-            int(self._cupy.count_nonzero(current_mask).item())
-            if self.uses_cuda
-            else current_mask.bit_count()
-        )
+        if count is None:
+            count = (
+                int(self._cupy.count_nonzero(current_mask).item())
+                if self.uses_cuda
+                else current_mask.bit_count()
+            )
 
         if count < self.max_count:
             return
@@ -210,9 +213,20 @@ class State:
             return
 
         next_level = level + 1
-        shifts = self.nums[next_level]
         table_next = self.bit_tables[next_level]
-        for shift in reversed(shifts):
+        next_paths = []
+        for shift in reversed(self.nums[next_level]):
+            next_mask = current_mask & table_next[shift]
+            next_count = (
+                int(self._cupy.count_nonzero(next_mask).item())
+                if self.uses_cuda
+                else next_mask.bit_count()
+            )
+            next_paths.append((next_count, shift, next_mask))
+
+        for next_count, shift, next_mask in sorted(
+            next_paths, key=lambda path: path[0], reverse=True
+        ):
             self.shift_path.append(shift)
-            self._search(next_level, current_mask & table_next[shift])
+            self._search(next_level, next_mask, next_count)
             self.shift_path.pop()

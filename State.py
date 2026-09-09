@@ -3,7 +3,7 @@ import logging
 import sys
 import time
 from types import ModuleType
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 try:
     from tqdm import tqdm
@@ -12,6 +12,7 @@ except ImportError:
 
 
 logger = logging.getLogger("HLSearch_Param")
+PROGRESS_UPDATE_INTERVAL = 100_000
 
 
 def _load_cuda_module() -> Optional[ModuleType]:
@@ -173,6 +174,12 @@ class State:
         self, level: int, current_mask: int, count: Optional[int] = None
     ) -> None:
         self.nodes_searched += 1
+        if (
+            self.show_progress
+            and tqdm is not None
+            and self.nodes_searched % PROGRESS_UPDATE_INTERVAL == 0
+        ):
+            self.pbar.set_postfix(depth=level + 1, max_count=self.max_count)
         if count is None:
             count = (
                 int(self._cupy.count_nonzero(current_mask).item())
@@ -206,16 +213,7 @@ class State:
             return
 
         next_level = level + 1
-        table_next = self.bit_tables[next_level]
-        next_paths = []
-        for shift in reversed(self.nums[next_level]):
-            next_mask = current_mask & table_next[shift]
-            next_count = (
-                int(self._cupy.count_nonzero(next_mask).item())
-                if self.uses_cuda
-                else next_mask.bit_count()
-            )
-            next_paths.append((next_count, shift, next_mask))
+        next_paths = self._build_next_paths(current_mask, next_level)
 
         ordered_paths = (
             sorted(next_paths, key=lambda path: path[0], reverse=True)
@@ -226,3 +224,23 @@ class State:
             self.shift_path.append(shift)
             self._search(next_level, next_mask, next_count)
             self.shift_path.pop()
+
+    def _build_next_paths(
+        self, current_mask: object, next_level: int
+    ) -> List[Tuple[int, int, object]]:
+        """次階層のシフトごとのマスクと残存候補数を作成する。"""
+        shifts = list(reversed(self.nums[next_level]))
+        table_next = self.bit_tables[next_level]
+        if self.uses_cuda:
+            next_masks = current_mask & table_next[shifts]
+            counts = self._cupy.count_nonzero(next_masks, axis=1).get()
+            return [
+                (int(count), shift, next_masks[index])
+                for index, (shift, count) in enumerate(zip(shifts, counts))
+            ]
+
+        return [
+            (next_mask.bit_count(), shift, next_mask)
+            for shift in shifts
+            for next_mask in [current_mask & table_next[shift]]
+        ]

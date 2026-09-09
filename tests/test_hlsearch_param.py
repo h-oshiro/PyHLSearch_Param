@@ -76,6 +76,38 @@ class StateTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "CUDA"):
                 State([2], [[0, 1]], 1, 0, 1, 1, use_cuda=True)
 
+    def test_batches_cuda_sibling_shifts_at_each_level(self) -> None:
+        class FakeCounts:
+            def get(self):
+                return [3, 2, 1]
+
+        class FakeCuda:
+            def __init__(self) -> None:
+                self.count_nonzero = MagicMock(return_value=FakeCounts())
+
+        class FakeMasks:
+            def __getitem__(self, index):
+                return [f"mask-{mask_index}" for mask_index in index]
+
+        class FakeCurrentMask:
+            def __and__(self, masks):
+                return masks
+
+        state = State([2, 3], [[0, 1], [0, 1, 2]], 2, 99, 3, 6)
+        state.uses_cuda = True
+        state._cupy = FakeCuda()
+        state.bit_tables = [None, FakeMasks()]
+
+        next_paths = state._build_next_paths(FakeCurrentMask(), 1)
+
+        self.assertEqual(
+            next_paths,
+            [(3, 2, "mask-2"), (2, 1, "mask-1"), (1, 0, "mask-0")],
+        )
+        state._cupy.count_nonzero.assert_called_once_with(
+            ["mask-2", "mask-1", "mask-0"], axis=1
+        )
+
     def test_shows_progress_for_top_level_shifts(self) -> None:
         progress_bar = MagicMock()
         progress_bar.__iter__.return_value = iter([1, 0])
@@ -100,6 +132,27 @@ class StateTests(unittest.TestCase):
         progress_bar.__iter__.assert_called_once_with()
         progress_bar.update.assert_not_called()
         progress_bar.set_postfix.assert_not_called()
+
+    def test_updates_progress_with_depth_and_max_count_every_100000_nodes(
+        self,
+    ) -> None:
+        progress_bar = MagicMock()
+        state = State(
+            [2],
+            [[0, 1]],
+            1,
+            99,
+            2,
+            4,
+            use_cuda=False,
+        )
+        state.pbar = progress_bar
+        state.nodes_searched = 99_999
+
+        with patch("State.tqdm", MagicMock()):
+            state._search(0, state.bit_tables[0][0])
+
+        progress_bar.set_postfix.assert_called_once_with(depth=1, max_count=0)
 
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(

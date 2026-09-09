@@ -16,8 +16,9 @@
 - CUDA 実行: CUDA 環境に対応する [CuPy](https://cupy.dev/)（例: `pip install cupy-cuda12x`）
 - 進捗表示: [tqdm](https://tqdm.github.io/)（`pip install tqdm`）
 
-CuPy と使用可能な CUDA デバイスを検出すると、`State` は自動的に CUDA を使って探索します。
-CuPy が未インストールの場合、または CUDA デバイスを利用できない場合は、従来どおり CPU で実行します。
+通常の探索は CPU で実行します。CUDA を使う場合だけ `--use-cuda` を明示的に指定してください。
+CuPy が未インストールの場合、または CUDA デバイスを利用できない場合に `--use-cuda` を指定すると、
+エラーで停止します。
 
 ## 実行方法
 
@@ -48,6 +49,7 @@ python .\HLSearch_Param.py --help
 | `--cols` | ビットマスクで探索する列数 |
 | `--include-paths` | 該当するシフト経路を保持して結果ファイルに出力 |
 | `--no-progress` | tqdm による進捗表示を無効化 |
+| `--use-cuda` | CUDA を明示的に使用する（利用できない場合はエラー） |
 | `--log-level` | コンソール出力のログレベル |
 
 `--primes-count` を指定する場合、`--depth` は指定件数以下にしてください。
@@ -98,6 +100,7 @@ python -m unittest tests.test_hlsearch_param.StateTests.test_run_records_all_pat
 ### 開発中
 
 - `limit` による固定の枝刈り下限を廃止した
+- CUDA の自動検出を廃止し、`--use-cuda` 指定時だけ CUDA を使用するようにした
 - `--primes-count` で `PRIMES` と対応する `NUMS` の先頭 N 件を探索対象として選択できるようにした
 - `State` クラスとビットテーブル生成処理を `State.py` に分離した
 - ビットマスク生成、探索の枝刈り、引数処理を対象とした単体テストを追加した

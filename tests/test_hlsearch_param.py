@@ -63,11 +63,13 @@ class StateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "primes\\[0\\]"):
             State([1], [[0]], 1, 0, 1, 1)
 
-    def test_uses_cpu_when_cuda_is_disabled(self) -> None:
-        state = State([2], [[0, 1]], 1, 0, 1, 1, use_cuda=False)
+    def test_uses_cpu_by_default_without_loading_cuda(self) -> None:
+        with patch("State._load_cuda_module") as load_cuda:
+            state = State([2], [[0, 1]], 1, 0, 1, 1)
 
         self.assertFalse(state.uses_cuda)
         self.assertEqual(state.bit_tables, [[0, 1]])
+        load_cuda.assert_not_called()
 
     def test_requires_cuda_when_requested(self) -> None:
         with patch("State._load_cuda_module", return_value=None):
@@ -189,6 +191,7 @@ class MainTests(unittest.TestCase):
                         "cols:4\n"
                         "include_paths:True\n"
                         "show_progress:True\n"
+                        "use_cuda:False\n"
                         "[1]\n"
                         "[0]\n",
                     )
@@ -233,6 +236,7 @@ class ParseArgsTests(unittest.TestCase):
                 "100",
                 "--include-paths",
                 "--no-progress",
+                "--use-cuda",
                 "--log-level",
                 "DEBUG",
             ]
@@ -245,4 +249,5 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(args.cols, 100)
         self.assertTrue(args.include_paths)
         self.assertFalse(args.show_progress)
+        self.assertTrue(args.use_cuda)
         self.assertEqual(args.log_level, "DEBUG")

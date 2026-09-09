@@ -72,7 +72,7 @@ class State:
         target: int,
         max_depth: int,
         cols: int,
-        use_cuda: Optional[bool] = None,
+        use_cuda: bool = False,
         collect_paths: bool = False,
         show_progress: bool = True,
     ) -> None:
@@ -109,8 +109,8 @@ class State:
         self.collect_paths = collect_paths
         self.show_progress = show_progress
 
-        self._cupy = _load_cuda_module() if use_cuda is not False else None
-        if use_cuda is True and self._cupy is None:
+        self._cupy = _load_cuda_module() if use_cuda else None
+        if use_cuda and self._cupy is None:
             raise RuntimeError("CUDA を利用できる CuPy 環境が必要です")
         self.uses_cuda = self._cupy is not None
         if self.uses_cuda:

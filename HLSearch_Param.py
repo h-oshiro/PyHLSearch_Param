@@ -47,6 +47,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=cfg.SHOW_PROGRESS,
         help="tqdm による進捗表示を無効化",
     )
+    parser.add_argument(
+        "--use-cuda",
+        action="store_true",
+        help="CUDA を明示的に使用する（利用できない場合はエラー）",
+    )
     # parser.add_argument("--output", type=str, default=shift_path_file, help="結果出力先")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="コンソールログレベル")
     return parser.parse_args(argv)
@@ -86,7 +91,13 @@ def main(
     LOG_PATH = setup_logging(base, args.log_level)
 
     logger.info("HLSearch_Param 開始 (log file: %s)", LOG_PATH)
-    logger.info("設定: depth=%d max_depth=%d target=%d", args.depth, args.max_depth, args.target)
+    logger.info(
+        "設定: depth=%d max_depth=%d target=%d use_cuda=%s",
+        args.depth,
+        args.max_depth,
+        args.target,
+        args.use_cuda,
+    )
 
     primes, nums = select_search_data(cfg.PRIMES, cfg.NUMS, args.primes_count)
     state = State(
@@ -96,6 +107,7 @@ def main(
         args.target,
         args.max_depth,
         args.cols,
+        use_cuda=args.use_cuda,
         collect_paths=args.include_paths,
         show_progress=args.show_progress,
     )
@@ -117,6 +129,7 @@ def main(
         f.write(f"cols:{args.cols}\n")
         f.write(f"include_paths:{args.include_paths}\n")
         f.write(f"show_progress:{args.show_progress}\n")
+        f.write(f"use_cuda:{args.use_cuda}\n")
         if args.include_paths:
             for shift in result_state.shifts:
                 logger.info("シフト経路: %s", shift)

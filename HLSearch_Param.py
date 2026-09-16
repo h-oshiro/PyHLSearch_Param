@@ -85,7 +85,7 @@ def main(
 
     state = State(
         cfg.PRIMES,
-        cfg.NUMS,
+        cfg.PARAMS,
         args.depth,
         args.target,
         args.max_depth,

@@ -84,6 +84,6 @@ PRIMES: List[int] = [
     1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511, 1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579,
 ]
 
-NUMS: list[list[int]] = []
+PARAMS: list[list[int]] = []
 for i in range(len(PRIMES)):
-    NUMS.append([j for j in range(PRIMES[i])])
+    PARAMS.append([j for j in range(int(PRIMES[i] / 2), PRIMES[i]-i)])

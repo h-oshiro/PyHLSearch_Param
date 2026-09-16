@@ -134,7 +134,7 @@ class StateTests(unittest.TestCase):
     def test_run_records_all_paths_tied_for_the_best_count(self) -> None:
         state = State(
             primes=[2, 3],
-            nums=[[0, 1], [0, 1, 2]],
+            params=[[0, 1], [0, 1, 2]],
             depth=2,
             target=99,
             max_depth=3,
@@ -154,7 +154,7 @@ class StateTests(unittest.TestCase):
     def test_run_counts_matches_without_collecting_paths_by_default(self) -> None:
         state = State(
             primes=[2, 3],
-            nums=[[0, 1], [0, 1, 2]],
+            params=[[0, 1], [0, 1, 2]],
             depth=2,
             target=99,
             max_depth=3,
@@ -197,7 +197,7 @@ class StateTests(unittest.TestCase):
     def test_run_discards_counts_above_target_at_max_depth(self) -> None:
         state = State(
             primes=[2],
-            nums=[[0, 1]],
+            params=[[0, 1]],
             depth=1,
             target=1,
             max_depth=1,
@@ -207,6 +207,21 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state.max_count, 0)
         self.assertEqual(state.results, 0)
         self.assertEqual(state.shifts, [])
+
+    def test_run_records_paths_matching_target_at_max_depth(self) -> None:
+        state = State(
+            primes=[2],
+            params=[[0, 1]],
+            depth=1,
+            target=1,
+            max_depth=1,
+            cols=3,
+        ).run()
+
+        self.assertEqual(state.target_results, 1)
+        self.assertEqual(state.target_shifts, [[0]])
+        self.assertEqual(state.max_count, 0)
+        self.assertEqual(state.results, 0)
 
 
 class MainTests(unittest.TestCase):

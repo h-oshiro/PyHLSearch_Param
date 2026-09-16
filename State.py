@@ -68,7 +68,7 @@ class State:
     def __init__(
         self,
         primes: Sequence[int],
-        nums: Sequence[Sequence[int]],
+        params: Sequence[Sequence[int]],
         depth: int,
         target: int,
         max_depth: int,
@@ -83,15 +83,18 @@ class State:
             raise ValueError(
                 f"depth={depth} が primes の要素数({len(primes)})を超えています"
             )
-        if depth > len(nums):
+        if depth > len(params):
             raise ValueError(
-                f"depth={depth} が nums の要素数({len(nums)})を超えています"
+                f"depth={depth} が params の要素数({len(params)})を超えています"
             )
         if cols <= 0:
             raise ValueError(f"cols は正の整数である必要があります: {cols}")
-        self.primes = list(primes[:depth])
-        self.nums = [list(shifts) for shifts in nums[:depth]]
-        for level, (prime, shifts) in enumerate(zip(self.primes, self.nums)):
+        self.primes = list(primes)
+        self.params = list(params)
+        for i in range(21):
+            params[i] = [0]
+
+        for level, (prime, shifts) in enumerate(zip(self.primes, self.params)):
             if not isinstance(prime, int) or prime <= 1:
                 raise ValueError(
                     f"primes[{level}] は2以上の整数である必要があります: {prime!r}"
@@ -136,7 +139,7 @@ class State:
             else (1 << self.cols) - 1
         )
 
-        shifts = reversed(self.nums[0])
+        shifts = reversed(self.params[0])
         if self.show_progress:
             if tqdm is None:
                 logger.warning(
@@ -146,7 +149,7 @@ class State:
             else:
                 self.pbar = tqdm(
                     shifts,
-                    total=len(self.nums[0]),
+                    total=len(self.params[0]),
                     desc="探索中",
                     unit="shift",
                     disable=not sys.stderr.isatty(),
@@ -198,14 +201,6 @@ class State:
                 self.max_count = count
                 self.results = 1
                 self.shifts = [list(self.shift_path)] if self.collect_paths else []
-                # if self.collect_paths:
-                #     logger.info(
-                #         "New max_count=%d (path=%s)",
-                #         self.max_count,
-                #         self.shift_path,
-                #     )
-                # else:
-                #     logger.info("New max_count=%d", self.max_count)
             elif count == self.max_count:
                 self.results += 1
                 if self.collect_paths:
@@ -229,7 +224,7 @@ class State:
         self, current_mask: object, next_level: int
     ) -> List[Tuple[int, int, object]]:
         """次階層のシフトごとのマスクと残存候補数を作成する。"""
-        shifts = list(reversed(self.nums[next_level]))
+        shifts = list(reversed(self.params[next_level]))
         table_next = self.bit_tables[next_level]
         if self.uses_cuda:
             next_masks = current_mask & table_next[shifts]

@@ -45,7 +45,7 @@ python .\HLSearch_Param.py --help
 | オプション | 説明 |
 | --- | --- |
 | `-d`, `--depth` | 使用する素数とシフト候補の階層数 |
-| `-t`, `--target` | `depth == max-depth` の場合に使用する上限値 |
+| `-t`, `--target` | `depth == max-depth` の場合に使用する目標値 |
 | `--max-depth` | `target` の判定を有効にする深さ |
 | `--cols` | ビットマスクで探索する列数 |
 | `--include-paths` | 該当するシフト経路を保持して結果ファイルに出力 |
@@ -61,6 +61,9 @@ python .\HLSearch_Param.py --help
 固定の残存候補数による下限は設けず、探索中に見つかった最大値を下回る枝のみ打ち切ります。
 最初の最大値を見つけた後は、各階層で次のシフトを適用した後の残存候補数が多い順に探索し、
 枝刈りの効果を高めます。同数のシフトは従来どおりの順序で探索します。
+`depth == max-depth` では、残存候補数が `target` を超える経路は破棄します。`target` と一致する
+経路は `State.target_shifts` に保存し、`State.target_results` に件数を加算して、その経路の探索を
+終了します。これらの目標一致経路は `--include-paths` の指定に関係なく `State` に保持されます。
 
 ## 設定
 
@@ -107,4 +110,5 @@ python -m unittest tests.test_hlsearch_param.StateTests.test_run_records_all_pat
 - CUDA の自動検出を廃止し、`--use-cuda` 指定時だけ CUDA を使用するようにした
 - `State` クラスとビットテーブル生成処理を `State.py` に分離した
 - ビットマスク生成、探索の枝刈り、引数処理を対象とした単体テストを追加した
+- `max-depth` で `target` と一致した経路を `State` に記録するようにした
 - 実行方法、設定、出力、テスト手順を README に記載した

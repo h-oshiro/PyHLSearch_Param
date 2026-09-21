@@ -1,126 +1,411 @@
-"""ビット演算を用いる Hardy-Littlewood 探索の高速版。"""
-import os
-import sys
-import datetime
+# HLSearch_param.py (numpy高速化版)
 import argparse
 import logging
 import logging.handlers
-from typing import Sequence
+import os
+import sys
+import time
+from collections.abc import Iterator, Sequence
+import numpy as np
+from numpy.typing import NDArray
+from tqdm import tqdm
 
-import Config as cfg
-from State import State
-
-logger = logging.getLogger("HLSearch_Param")
-
-
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="HLSearch Param: 素数シフト探索プログラム", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-d", "--depth", type=int, default=cfg.DEPTH, help="探索する階層数")
-    parser.add_argument("--max-depth", type=int, default=cfg.MAX_DEPTH, help="最大深さ")
-    parser.add_argument("-t", "--target", type=int, default=cfg.TARGET, help="depth == max-depth のときの目標値")
-    parser.add_argument("--cols", type=int, default=cfg.COLS, help="列数")
-    parser.add_argument(
-        "--include-paths",
-        action="store_true",
-        help="該当するシフト経路を保持して結果ファイルに出力",
-    )
-    parser.add_argument(
-        "--no-progress",
-        action="store_false",
-        dest="show_progress",
-        default=cfg.SHOW_PROGRESS,
-        help="tqdm による進捗表示を無効化",
-    )
-    parser.add_argument(
-        "--use-cuda",
-        action="store_true",
-        help="CUDA を明示的に使用する（利用できない場合はエラー）",
-    )
-    # parser.add_argument("--output", type=str, default=shift_path_file, help="結果出力先")
-    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="コンソールログレベル")
-    return parser.parse_args(argv)
+# --- logging設定 ---
+logger = logging.getLogger(__name__)
 
 def setup_logging(base_dir: str | os.PathLike[str], console_level: str = "INFO") -> str:
-    log_path = cfg.LOG_FILE
-    logger.setLevel(logging.DEBUG)
-    for handler in logger.handlers[:]:
-        handler.close()
-        logger.removeHandler(handler)
+    """コンソールとファイルの両方にログを出力するよう設定する。
 
-    formatter = logging.Formatter(cfg.LOG_FORMAT)
+    Parameters
+    ----------
+    base_dir : str | os.PathLike[str]
+        ログファイルを作成するディレクトリ。
+    console_level : str
+        コンソールに出すログレベル("DEBUG"/"INFO"/"WARNING"/"ERROR")。
+        ログファイル側は常にDEBUGレベルで出力する。
+    """
+    log_path = os.path.join(base_dir, "HLSearch.log")
+
+    logger.setLevel(logging.DEBUG)
+    logger.handlers.clear()  # 二重登録防止(再実行・再インポート対策)
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, console_level))
+    console_handler.setLevel(console_level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    file_handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=cfg.LOG_MAX_BYTES, backupCount=cfg.LOG_BACKUP_COUNT, encoding="utf-8")
-    file_handler.setLevel(cfg.FILE_LOG_LEVEL)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_path,
+        maxBytes=10*1024*1024,
+        backupCount=3,
+        encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    logger.info("ログファイルを作成しました: %s", log_path)
+    logger.info(f"ログファイルを作成しました: {log_path}")
     return log_path
 
 
-def main(
-    argv: Sequence[str] | None = None,
-    base_dir: str | os.PathLike[str] | None = None,
-) -> State:
-    """コマンドライン引数で探索を実行し、結果をファイルへ出力する。"""
-    args = parse_args(argv)
-    base = os.fspath(base_dir) if base_dir is not None else os.path.dirname(
-        os.path.abspath(__file__)
+COLS: int = 3159
+IDX: NDArray[np.int64] = np.arange(1, COLS + 1)  # 元コードの range(1, 3160) に対応
+DEPTH: int = 8
+MAX_DEPTH: int = 249
+PROGRESS_MININTERVAL: float = 1.0  # tqdm進捗表示の最短更新間隔(秒)
+PROGRESS_COUNT: int = 10000
+
+# 2,3,5,7,11,13,...,1579 の素数リスト
+PRIMES: list[int] = [
+    2, 3, 5, 7, 11, 13, 17, 19, 
+    23, 29, 31, 37, 41, 43, 47, 53, 
+    59, 61, 67, 71, 73, 79, 83, 89, 
+    97, 101, 103, 107, 109, 113, 127, 131, 
+    137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227,
+    229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349,
+    353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479,
+    487, 491, 499, 503, 509, 521, 523, 541, 547, 557, 563, 569, 571, 577, 587, 593, 599, 601, 607, 613, 617, 619,
+    631, 641, 643, 647, 653, 659, 661, 673, 677, 683, 691, 701, 709, 719, 727, 733, 739, 743, 751, 757, 761, 769,
+    773, 787, 797, 809, 811, 821, 823, 827, 829, 839, 853, 857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929,
+    937, 941, 947, 953, 967, 971, 977, 983, 991, 997, 1009, 1013, 1019, 1021, 1031, 1033, 1039, 1049, 1051, 1061,
+    1063, 1069, 1087, 1091, 1093, 1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187, 1193,
+    1201, 1213, 1217, 1223, 1229, 1231, 1237, 1249, 1259, 1277, 1279, 1283, 1289, 1291, 1297, 1301, 1303, 1307,
+    1319, 1321, 1327, 1361, 1367, 1373, 1381, 1399, 1409, 1423, 1427, 1429, 1433, 1439, 1447, 1451, 1453, 1459,
+    1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511, 1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579,
+]
+ROWS: int = len(PRIMES)
+PARAMS: list[list[int]] = []
+for row in range(ROWS):
+    PARAMS.append([i for i in range(1, PRIMES[row])])
+# PARAMS[0] = [1]
+
+def shift_array(arr: NDArray[np.bool_], k: int) -> NDArray[np.bool_]:
+    """
+    配列を右にk個シフトする(numpy版)。先頭k要素は0埋めし、末尾のk要素は捨てる。
+    """
+    n = len(arr)
+    if k <= 0:
+        return arr.copy()
+    if k >= n:
+        return np.zeros(n, dtype=arr.dtype)
+    result = np.empty(n, dtype=arr.dtype)
+    result[:k] = 0
+    result[k:] = arr[: n - k]
+    return result
+ 
+
+def build_base_rows(primes: Sequence[int]) -> NDArray[np.bool_]:
+    """
+    指定した素数リストからbase_rows配列を作る。
+
+    後段の処理(search)では「0かどうか」しか使わないため、値そのもの(素数p)
+    ではなく bool(idx % p == 1) を格納する。int64(8byte/要素)ではなく
+    bool(1byte/要素)にすることでメモリ転送量が1/8になり、shift_array や
+    AND演算のコストが下がる。
+    """
+    return np.array([(IDX % p == 1) for p in primes])
+
+
+def build_shift_table(primes: Sequence[int]) -> list[NDArray[np.bool_]]:
+    """
+    各階層(prime)ごとに、そのレベルで取り得る全てのシフト値
+    k = 0, 1, ..., p-1 に対応する shift_array(row, k) の結果を
+    あらかじめ計算してテーブル化する。
+
+    Parameters
+    ----------
+    primes : list[int]
+        探索対象の素数リスト(depth分だけ、先頭から使う)。
+
+    Returns
+    -------
+    list[np.ndarray]
+        shift_table[level] は shape=(primes[level], COLS) の bool 配列。
+        shift_table[level][k] が「level段目の基準行を k だけ右シフトした行」
+        (= search で言う row_nonzero)に対応する。
+    """
+    base_rows = build_base_rows(primes)
+    shift_table: list[NDArray[np.bool_]] = []
+    for level, p in enumerate(primes):
+        row = base_rows[level]
+        shifted = np.empty((p, COLS), dtype=bool)
+        for k in range(p):
+            shifted[k] = shift_array(row, k)
+        shift_table.append(shifted)
+    return shift_table
+
+class State:
+    """
+    search()/run() が探索全体(スタックによる反復探索)で引き回す状態をまとめたクラス。
+
+    Attributes
+    ----------
+    key : list[int]
+        現在の階層までの各素数に対するシフト値のリスト。
+        呼び出し側が append/pop で管理する。
+    primes : list[int]
+        探索対象の素数リスト(先頭から順に1階層ずつ対応)。
+    shift_table : list[np.ndarray]
+        build_shift_table(primes[:depth]) で事前作成したシフト済み配列テーブル。
+        shift_table[level][key[level]] が search() で必要な行(row_nonzero)を
+        直接与えるため、探索中に shift_array を呼ぶ必要がない。
+    zero_mask : np.ndarray
+        shape=(COLS,) の真偽値配列。「現在の階層までで全て0だった列」を表す。
+        search() 内で1階層進むたびに更新され、その階層の探索が終わったら
+        呼び出し前の値に戻される(backtrack)。
+    depth : int
+        search()の深さ
+    max_depth : int
+        深さの最大値
+    max_count : int
+        これまでに見つかった最大の count。
+    shifts : list[list[int]]
+        max_count を達成した key のリスト。
+    results : int
+        max_count を達成した組み合わせの件数。
+    start_time : float
+        探索開始時刻(time.time())。経過時間の表示に使う。
+    node_count : int
+        search() が呼ばれた回数(探索したノード数)。進捗表示に使う。
+    pbar : tqdm
+        進捗表示用の tqdm インスタンス。ノード数のカウントと
+        best/hits/depth/key の postfix 表示に使う。
+    """
+
+    __slots__ = (
+        "key",
+        "primes",
+        "params",
+        "shift_table",
+        "zero_mask",
+        "max_depth",
+        "max_count",
+        "shifts",
+        "results",
+        "start_time",
+        "node_count",
+        "pbar",
     )
-    LOG_PATH = setup_logging(base, args.log_level)
 
-    logger.info("HLSearch_Param 開始 (log file: %s)", LOG_PATH)
-    logger.info(
-        "設定: depth=%d max_depth=%d target=%d use_cuda=%s",
-        args.depth,
-        args.max_depth,
-        args.target,
-        args.use_cuda,
+    def __init__(self, primes: Sequence[int], params: list[list[int]], shift_table: list[NDArray[np.bool_]], max_depth: int=MAX_DEPTH) -> None:
+        self.key: list[int] = []
+        self.primes: Sequence[int] = primes
+        self.params: list[list[int]] = params
+        self.shift_table: list[NDArray[np.bool_]] = shift_table
+        self.zero_mask: NDArray[np.bool_] = np.ones(COLS, dtype=bool)
+        self.max_depth: int = max_depth
+        self.max_count: int = 0
+        self.shifts: list[list[int]] = []
+        self.results: int = 0
+        self.start_time: float = time.time()
+        self.node_count: int = 0
+        self.pbar = tqdm(
+            desc="search",
+            unit="node",
+            unit_scale=True,
+            dynamic_ncols=True,
+            mininterval=PROGRESS_MININTERVAL,
+        )
+
+    def report_progress(self, force: bool = False) -> None:
+        """
+        tqdmの進捗バーを更新する(ログファイルには出さない)。
+
+        呼び出しが多い(再帰の全ノードで呼ばれる)ため、実際の画面再描画は
+        tqdm側が mininterval 秒に一度だけに間引いてくれる。force=True の
+        ときは set_postfix に refresh=True を渡し、間引かずに必ず再描画する
+        (探索開始・終了時など)。
+        """
+        self.pbar.update(1)
+        if self.node_count % PROGRESS_COUNT == 0:
+            self.pbar.set_postfix(
+                best=self.max_count,
+                hits=self.results,
+                depth=len(self.key),
+                key=self.key,
+                refresh=force,
+            )
+
+    def search(self, depth: int) -> None:
+        """
+        各階層のシフト値を探索する(反復版・スタックによる明示的DFS)。
+
+        元の実装は「1階層シフトを決める→自分自身を再帰呼び出しして
+        次の階層を決める」という再帰関数だったが、depth(ひいては
+        再帰の深さ)が大きくなると Python の再帰上限(sys.setrecursionlimit)
+        や関数呼び出しオーバーヘッドが問題になりうる。
+        ここでは再帰呼び出しの代わりに、階層ごとの「ループの途中状態」を
+        自前のスタックに積んで管理することで、同じ探索順序・同じ結果を
+        非再帰(反復)で実現する。
+
+        スタックの各要素は (level, base_mask, iterator) の3つ組:
+            level      : このループで値を決める階層(0-indexed)。
+                         元の再帰版での level = len(key) - 1 に対応。
+            base_mask  : この階層のどの枝を試す場合でも共通して使う
+                         「親までの zero_mask」。元の再帰版での
+                         prev_mask(= self.zero_mask の呼び出し前の値)
+                         に対応する。
+            iterator   : range(primes[level]) の残り候補値を返す
+                         イテレータ。元の re-entrant な `for i in range(...)`
+                         ループの「途中状態」をこれで表現する。
+
+        1つの節点(= key の1要素)を「探索し尽くして親に戻る」タイミングは、
+        自分の子階層のイテレータが尽きた(StopIteration)瞬間として検出し、
+        そこで元の再帰版の「self.zero_mask = prev_mask; return」に相当する
+        後始末(zero_maskの復元・keyのpop)を行う。
+
+        Parameters
+        ----------
+        depth : int
+            探索する階層数(= 使用する素数の個数)。可変。
+        """
+        key = self.key
+        stack: list[tuple[int, NDArray[np.bool_], Iterator[int]]] = [
+            # (0, self.zero_mask, iter(range(self.primes[0])))
+            (0, self.zero_mask, iter(self.params[0]))
+        ]
+
+        while stack:
+            level, base_mask, it = stack[-1]
+            try:
+                i = next(it)
+            except StopIteration:
+                # この階層で試せる値を使い切った → 親の階層へbacktrack
+                finished_base_mask = stack.pop()[1]
+                if stack:
+                    key.pop()
+                    self.zero_mask = stack[-1][1]
+                else:
+                    self.zero_mask = finished_base_mask  # 最上位まで戻り切った
+                continue
+
+            key.append(i)
+            self.node_count += 1
+            self.report_progress()
+
+            row_nonzero = self.shift_table[level][i]  # True = その素数の倍数位置(事前作成済み)
+            node_mask = base_mask & ~row_nonzero
+            count = int(np.count_nonzero(node_mask))
+            # logger.debug("depth=%d key=%s count=%s", level + 1, key, count)
+
+            if count + (depth - level) <= self.max_count:
+                key.pop()
+                continue
+
+            if count < self.max_count:
+                # logger.debug(("break", list(key), count))
+                key.pop()  # この枝は打ち切り(子孫を探索しない)、次のiへ
+                continue
+
+            if level + 1 >= depth:
+                if not (depth == self.max_depth):
+                    if count > self.max_count:
+                        self.max_count = count
+                        self.results = 1
+                        self.shifts.clear()
+                        self.shifts.append(list(key))
+                        self.pbar.write(f"done key={list(key)} count={count}")
+                        logger.info(("done", level, list(key), count))
+                    elif count == self.max_count:
+                        self.results += 1
+                        self.shifts.append(list(key))
+                        # logger.debug(("done", level, list(key), count))
+
+                key.pop()  # 最深階層に到達、次のiへ
+                continue
+
+            # さらに深く探索: 子階層のループをスタックに積んで先に進む
+            self.zero_mask = node_mask
+            # next_p = self.primes[level + 1]
+            next_p = self.params[level +1]
+            # stack.append((level + 1, node_mask, iter(range(next_p))))
+            stack.append((level + 1, node_mask, iter(next_p)))
+
+    def run(self, depth: int) -> "State":
+        """primes[:depth] を使って深さ depth までの探索を実行するエントリポイント"""
+        try:
+            self.search(depth)
+            self.report_progress(force=True)
+        finally:
+            self.pbar.close()
+
+        return self
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """コマンドライン引数を解析する。
+
+    未指定の項目はモジュール冒頭で定義済みのデフォルト値
+    (DEPTH / MAX_DEPTH / PROGRESS_MININTERVAL)を使う。
+    """
+    parser = argparse.ArgumentParser(
+        description="HLSearch: 素数シフト探索プログラム",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-
-    state = State(
-        cfg.PRIMES,
-        cfg.PARAMS,
-        args.depth,
-        args.target,
-        args.max_depth,
-        args.cols,
-        use_cuda=args.use_cuda,
-        collect_paths=args.include_paths,
-        show_progress=args.show_progress,
+    parser.add_argument(
+        "-d", "--depth",
+        type=int,
+        default=DEPTH,
+        help="探索する階層数(使用する素数の個数)。primesの長さ以下である必要がある。",
     )
-    result_state = state.run()
-
-    logger.info("最大値: %d", result_state.max_count)
-    logger.info("該当件数: %d", result_state.results)
-
-    now = datetime.datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(base, f"results_{timestamp}.txt")
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(f"max_count:{result_state.max_count}\n")
-        f.write(f"results:{result_state.results}\n")
-        f.write(f"depth:{args.depth}\n")
-        f.write(f"target:{args.target}\n")
-        f.write(f"max_depth:{args.max_depth}\n")
-        f.write(f"cols:{args.cols}\n")
-        f.write(f"include_paths:{args.include_paths}\n")
-        f.write(f"show_progress:{args.show_progress}\n")
-        f.write(f"use_cuda:{args.use_cuda}\n")
-        if args.include_paths:
-            for shift in result_state.shifts:
-                logger.info("シフト経路: %s", shift)
-                f.write(f"{shift}\n")
-
-
-    logger.info("HLSearch_Param 終了")
-    return result_state
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=MAX_DEPTH,
+        help="最深部。",
+    )
+    parser.add_argument(
+        "--mininterval",
+        type=float,
+        default=PROGRESS_MININTERVAL,
+        help="tqdm進捗表示の最短更新間隔(秒)。",
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="コンソールに出すログレベル(ログファイルは常にDEBUG)。",
+    )
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    args = parse_args()
+
+    base = os.path.dirname(os.path.abspath(__file__))
+    log_path = setup_logging(base, console_level=args.log_level)
+
+    # モジュールグローバル(search()が直接参照している)をCLI引数で上書き
+    DEPTH = args.depth
+    MAX_DEPTH = args.max_depth
+    PROGRESS_MININTERVAL = args.mininterval
+
+    primes = PRIMES
+    params = PARAMS
+
+    if DEPTH > len(primes):
+        logger.error(
+            "depth=%d が使用可能な素数の個数(%d)を超えています", DEPTH, len(primes)
+        )
+        sys.exit(1)
+
+    logger.info("HLSearch 開始 (log file: %s)", log_path)
+    logger.info(
+        "設定: depth=%d max_depth=%d",
+        DEPTH, MAX_DEPTH,
+    )
+
+    shift_table = build_shift_table(primes[:DEPTH])
+    state = State(primes, params, shift_table, max_depth=MAX_DEPTH)
+    result_state = state.run(DEPTH)
+
+    logger.info("最大値: %d",result_state.max_count)
+    logger.info("該当件数: %d", result_state.results)
+    for shift in result_state.shifts:
+        logger.debug(f"{shift}")
+
+    logger.info("HLSearch 終了")
